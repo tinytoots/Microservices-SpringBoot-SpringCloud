@@ -19,11 +19,14 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 @RestController
 public class UserJPAResource {
 
-    @Autowired
-    private UserDaoService service;
+//    @Autowired
+//    private UserDaoService service;
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    PostRepository postRepository;
 
     // retrieveAllUsers
     @GetMapping("/jpa/users")
@@ -56,16 +59,13 @@ public class UserJPAResource {
 
     @DeleteMapping("/jpa/users/{id}")
     public void deleteUser(@PathVariable int id) {
-        User user = service.deleteById(id);
-
-        if (user == null)
-            throw new UserNotFoundException("id-" + id);
+        userRepository.deleteById(id);
     }
 
     // @RequestBody用来map User参数到User类中，让属性一一对应
     @PostMapping("/jpa/users")
     public ResponseEntity<Object> createUser(@Valid @RequestBody User user) {
-        User savedUser = service.save(user);
+        User savedUser = userRepository.save(user);
 
         // /user/{id} savedUser.getId()
         // ServletUriComponentsBuilder.fromCurrentRequest()返回current request uri, 然后append/{id}
@@ -75,7 +75,43 @@ public class UserJPAResource {
                 .buildAndExpand(savedUser.getId()).toUri();
 
         return ResponseEntity.created(location).build();
+    }
 
+
+    @GetMapping("/jpa/users/{id}/posts")
+    public List<Post> retrieveAllUsers(@PathVariable int id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (!userOptional.isPresent()) {
+            throw new UserNotFoundException("id-" + id);
+        }
+
+        return userOptional.get().getPosts();
+    }
+
+    @PostMapping("/jpa/users/{id}/posts")
+    public ResponseEntity<Object> createPost(@PathVariable int id, @RequestBody Post post) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (!userOptional.isPresent()) {
+            throw new UserNotFoundException("id-" + id);
+        }
+
+        User user = userOptional.get();
+
+        // the user which is retrieved from the database
+        post.setUser(user);
+
+        // saving the post to the database
+        postRepository.save(post);
+
+        // get the path of the post, so we can return the location of the created post
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(post.getId()).toUri();
+
+        return ResponseEntity.created(location).build();
     }
 
 
